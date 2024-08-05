@@ -61,9 +61,8 @@ end
 
 When only a single band `h` is provided, compute the integration kernel without summing over bands. 
 """
-function Γabc!(ζ::MVector{6, Float64}, a::Patch, b::Patch, c::Patch, T::Real, Δε::Real, ε, d::SVector{2, Float64}, e_max)
-    @inline εabc = ε(d) # Energy from momentum conservation
-    abs(εabc) > e_max && return 0.0
+function Γabc!(ζ::MVector{6, Float64}, η::SVector{6, Float64}, a::Patch, b::Patch, c::Patch, T::Real, Δε, ε, d::SVector{2, Float64}, e_max)
+    εabc = ε(d) # Energy from momentum conservation
 
     δ = energy(a) + energy(b) - energy(c) - εabc # Energy conservation violations
 
@@ -78,7 +77,7 @@ function Γabc!(ζ::MVector{6, Float64}, a::Patch, b::Patch, c::Patch, T::Real, 
     ζ[4] = v[1] * b.jinv[1,2] + v[2] * b.jinv[2,2]
     ζ[5] = - (v[1] * c.jinv[1,1] + v[2] * c.jinv[2,1])
     ζ[6] = - (v[1] * c.jinv[1,2] + v[2] * c.jinv[2,2])
-    u::SVector{6, Float64} = (Δε / 2) * [1.0, 0.0, 1.0, 0.0, -1.0, 0.0] - ζ
+    u::SVector{6, Float64} = η - ζ
 
     if abs(δ) < Δε * 1e-4
         return vol * a.djinv * b.djinv * c.djinv * ρ^(5/2) * (1 - f0(εabc, T)) / norm(u)
@@ -91,8 +90,8 @@ function Γabc!(ζ::MVector{6, Float64}, a::Patch, b::Patch, c::Patch, T::Real, 
         r5::Float64 = (ρ - δ^2 / dot(u,u) )^(5/2)
 
         # if abs(εabc) > e_max
-        # @show vol * a.djinv * b.djinv * c.djinv * r5 * (1 - f0(εabc + dot(ζ, xpara), T)) / norm(u)
-            # return 0.0
+        #     res = f0(a.energy, T) * f0(b.energy, T) * (1 - f0(c.energy, T)) * r5 * (1 - f0(εabc + dot(ζ, xpara), T)) / ρ^(5/2)
+        #     @show res
         # end
 
         return vol * a.djinv * b.djinv * c.djinv * r5 * (1 - f0(εabc + dot(ζ, xpara), T)) / norm(u)
@@ -364,12 +363,13 @@ end
 
 function electron_electron(grid::Vector{Patch}, i::Int, j::Int, bands, Δε::Real, T::Real, Fpp::Function, Fpk::Function, n_bands::Int, α)
     Lij::Float64 = 0.0
-    f0s = map(x -> f0(energy(x), T), grid) # Fermi-Dirac Grid
+    f0s = map(x -> f0(x.energy, T), grid) # Fermi-Dirac Grid
     e_max = α*T
 
-    w123 = Vector{Float64}(undef, n_bands)
-    w124 = Vector{Float64}(undef, n_bands)
+    w123::Float64 = 0.0
+    w124::Float64 = 0.0
     ζ  = MVector{6,Float64}(undef)
+    η::SVector{6,Float64} = (Δε / 2.0) * [1.0, 0.0, 1.0, 0.0, -1.0, 0.0]
 
     kij = grid[i].momentum + grid[j].momentum
     qij = grid[i].momentum - grid[j].momentum
@@ -383,24 +383,32 @@ function electron_electron(grid::Vector{Patch}, i::Int, j::Int, bands, Δε::Rea
         qimj = qij + grid[m].momentum
 
         for μ in eachindex(bands)
-            energies[μ] = bands[μ](kijm)
+            energies[μ] = abs(bands[μ](kijm))
         end
-        @show argmax(energies)
+        μ4 = argmin(energies) # Band to which k4 belongs
+        # @show energies ./ e_max
 
-        Weff_squared_123!(w123, grid[i], grid[j], grid[m], Fpp, Fpk, kijm)
+        # if energies[μ4] < e_max
+        w123 = Weff_squared_123(grid[i], grid[j], grid[m], Fpp, Fpk, kijm, μ4)
 
-        for μ in eachindex(w123)
-            if w123[μ] != 0
-                Lij += w123[μ] * Γabc!(ζ, grid[i], grid[j], grid[m], T, Δε, bands[μ], kijm, e_max) * f0s[j] * (1 - f0s[m])
-            end
+        if w123 != 0
+            Lij += w123 * Γabc!(ζ, η, grid[i], grid[j], grid[m], T, Δε, bands[μ4], kijm, e_max) * f0s[j] * (1 - f0s[m])
+        end
+        # end
+
+        for μ in eachindex(bands)
+            energies[μ] = abs(bands[μ](qimj))
+        end
+        μ34 = argmin(energies)
+
+        # if energies[μ34] < e_max
+        w123 = Weff_squared_123(grid[i], grid[m], grid[j], Fpp, Fpk, qimj, μ34)
+        w124 = Weff_squared_124(grid[i], grid[m], grid[j], Fpp, Fpk, qimj, μ34)
+        
+        if w123 + w124 != 0.0
+            Lij -= (w123 + w124) * Γabc!(ζ, η, grid[i], grid[m], grid[j], Δε, T, bands[μ34], qimj, e_max) * f0s[m] * (1 - f0s[j])
         end
 
-        Weff_squared_123!(w123, grid[i], grid[m], grid[j], Fpp, Fpk, qimj)
-        Weff_squared_124!(w124, grid[i], grid[m], grid[j], Fpp, Fpk, qimj)
-
-        for μ in eachindex(w123)
-            Lij -= (w123[μ] + w124[μ]) * Γabc!(ζ, grid[i], grid[m], grid[j], T, Δε, bands[μ], qimj, e_max) * f0s[m] * (1 - f0s[j])
-        end
     end
 
     return Lij * f0s[i]

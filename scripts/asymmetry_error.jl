@@ -27,8 +27,7 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
         title = L"F_{\mathbf{k}_1\mathbf{k}_2}^{\mu_1\mu_2} = (W_{\mathbf{k}_1}^\dagger W_{\mathbf{k}_1})^{\mu_1\mu_2}"
     end
 
-    N = 3000
-    @show ℓ^2
+    N = 5000
     errors = Vector{Float64}(undef, N)
     counter = 0
     while true
@@ -45,7 +44,7 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
     ## Fit histogram of errors ##
     x_lower = 0.0
     x_upper = 0.5
-    n_bins  = 100
+    n_bins  = 50
     step    = (x_upper - x_lower) / n_bins 
     bins = LinRange(x_lower, x_upper, n_bins)
 
@@ -70,7 +69,7 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
 end
 
 T   = 12.0
-n_ε = 14
+n_ε = 12
 n_θ = 38
 
 include(joinpath(@__DIR__, "materials", "Sr2RuO4.jl"))
