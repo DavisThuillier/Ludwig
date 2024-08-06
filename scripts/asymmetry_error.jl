@@ -1,12 +1,8 @@
 using Ludwig
-using HDF5
-using Interpolations
 using StaticArrays
 import LinearAlgebra: dot
 using CairoMakie
-using LsqFit
 using StatsBase
-using ProgressBars
 
 function main(T::Real, n_ε::Int, n_θ::Int, α)
     T = kb * T # Convert K to eV
@@ -27,18 +23,35 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
         title = L"F_{\mathbf{k}_1\mathbf{k}_2}^{\mu_1\mu_2} = (W_{\mathbf{k}_1}^\dagger W_{\mathbf{k}_1})^{\mu_1\mu_2}"
     end
 
-    N = 5000
+    N = 1000
     errors = Vector{Float64}(undef, N)
     counter = 0
+    intube_min = 1.0
+    intube_max = 0.0
+    intube_avg = 0.0
+
     while true
         i,j = rand(1:ℓ, 2)
-        Lij = Ludwig.electron_electron(mesh.patches, i, j, bands, Δε, T, Fpp, Fpk, mesh.n_bands, mesh.α)
-        Lji = Ludwig.electron_electron(mesh.patches, j, i, bands, Δε, T, Fpp, Fpk, mesh.n_bands, mesh.α)
+
+        Lij, intube = Ludwig.electron_electron(mesh.patches, i, j, bands, Δε, T, Fpp, Fpk, mesh.n_bands, mesh.α)
+        intube > intube_max && (intube_max = intube)
+        intube < intube_min && (intube_min = intube)
+        intube_avg += intube
+
+        Lji, intube = Ludwig.electron_electron(mesh.patches, j, i, bands, Δε, T, Fpp, Fpk, mesh.n_bands, mesh.α)
+        intube > intube_max && (intube_max = intube)
+        intube < intube_min && (intube_min = intube)
+        intube_avg += intube
 
         counter += 1
         errors[counter] = abs( 2 * (Lij - Lji) / (Lij + Lji) )
-        mod(counter, 100) == 0 && @show counter
+        if mod(counter, 100) == 0
+            @show counter
+            @show intube_min, intube_max
+            @show intube_avg / (2 * counter)
+        end
         counter == N && break
+
     end
 
     ## Fit histogram of errors ##
@@ -69,7 +82,7 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
 end
 
 T   = 12.0
-n_ε = 12
+n_ε = 22
 n_θ = 38
 
 include(joinpath(@__DIR__, "materials", "Sr2RuO4.jl"))

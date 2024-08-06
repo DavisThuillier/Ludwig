@@ -378,17 +378,18 @@ function electron_electron(grid::Vector{Patch}, i::Int, j::Int, bands, Δε::Rea
 
     energies = Vector{Float64}(undef, n_bands)
 
+    counter = 0
     for m in eachindex(grid)
-        kijm = kij - grid[m].momentum
-        qimj = qij + grid[m].momentum
+        kijm = map_to_first_bz(kij - grid[m].momentum)
+        qimj = map_to_first_bz(qij + grid[m].momentum)
 
         for μ in eachindex(bands)
             energies[μ] = abs(bands[μ](kijm))
         end
         μ4 = argmin(energies) # Band to which k4 belongs
-        # @show energies ./ e_max
+        energies[μ4] < e_max && (counter += 1)
 
-        # if energies[μ4] < e_max
+        
         w123 = Weff_squared_123(grid[i], grid[j], grid[m], Fpp, Fpk, kijm, μ4)
 
         if w123 != 0
@@ -411,7 +412,9 @@ function electron_electron(grid::Vector{Patch}, i::Int, j::Int, bands, Δε::Rea
 
     end
 
-    return Lij * f0s[i]
+    
+    return Lij * f0s[i], counter / length(grid)
+
 end
 
 # function Iab(a::Patch, b::Patch, Δε::Float64, V_squared::Function)
