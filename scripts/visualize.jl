@@ -65,10 +65,15 @@ function deformation_potentials()
 end
 
 function main()
-    T = 24 * kb
-    n_ε = 18
+    T = 12 * kb
+    n_ε = 12
     n_θ = 38
-    mesh, _ = Ludwig.multiband_mesh(bands, orbital_weights, T, n_ε, n_θ; α = 18.0)
+    mesh, _ = Ludwig.multiband_mesh(bands, orbital_weights, T, n_ε, n_θ; α = 8.0)
+    ℓ = length(mesh.patches)
+
+    i,j = rand(1:ℓ, 2)
+
+    kij = mesh.patches[i].momentum + mesh.patches[j].momentum
 
     corner_ids = map(x -> x.corners, mesh.patches)
 
@@ -83,20 +88,19 @@ function main()
               limits = (-0.5,0.5,-0.5,0.5)
     )
     
-    ℓ = length(mesh.patches)
+    p = poly!(ax, quads, color = :black)
+    scatter!(ax, map(x -> Ludwig.map_to_first_bz(kij - x.momentum), mesh.patches), color = :white)
 
-    p = poly!(ax, quads, color = 1:length(mesh.patches), colormap = :viridis)
-
-    xs = map(x -> x.momentum[1], mesh.patches)
-    ys = map(x -> x.momentum[2], mesh.patches)
-    us = map(x -> inv(x.jinv)[1,1] / norm(inv(x.jinv)[1,:]), mesh.patches)
-    vs = map(x -> inv(x.jinv)[1,2] / norm(inv(x.jinv)[1, :]), mesh.patches)
+    # xs = map(x -> x.momentum[1], mesh.patches)
+    # ys = map(x -> x.momentum[2], mesh.patches)
+    # us = map(x -> inv(x.jinv)[1,1] / norm(inv(x.jinv)[1,:]), mesh.patches)
+    # vs = map(x -> inv(x.jinv)[1,2] / norm(inv(x.jinv)[1, :]), mesh.patches)
     # us = map(x -> x.v[1] / norm(x.v), grid)
     # vs = map(x -> x.v[2] / norm(x.v), grid)
     # arrows!(ax, xs, ys, us, vs, lengthscale = 0.01, arrowsize = 3, linecolor = :black, arrowcolor = :black)
 
     
-    Colorbar(f[1,2], p)
+    # Colorbar(f[1,2], p)
     display(f)
 end
 

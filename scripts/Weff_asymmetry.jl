@@ -1,4 +1,6 @@
 using Ludwig
+using StaticArrays
+using LinearAlgebra
 
 function main(T::Real, n_ε::Int, n_θ::Int, α)
     T = kb * T # Convert K to eV
@@ -43,23 +45,25 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
         end
         μjmi = argmin(energies) # Band to which k4 belongs
 
-        wij = Ludwig.Weff_squared_123(grid[i], grid[j], grid[m], Fpp, Fpk, kijm, μijm) 
-        Kijm += Ludwig.Γabc!(ζ, η, grid[i], grid[j], grid[m], T, Δε, bands[μijm], kijm, e_max) * (1 - f0(grid[m].energy, T))# * wij
+        # wij = Ludwig.Weff_squared_123(grid[i], grid[j], grid[m], Fpp, Fpk, kijm, μijm) 
+        # Kijm += Ludwig.Γabc!(ζ, η, grid[i], grid[j], grid[m], T, Δε, bands[μijm], kijm, e_max) * (1 - f0(grid[m].energy, T))# * wij
 
-        wji = Ludwig.Weff_squared_123(grid[j], grid[i], grid[m], Fpp, Fpk, kijm, μijm) 
-        Kjim += Ludwig.Γabc!(ζ, η, grid[j], grid[i], grid[m], T, Δε, bands[μijm], kijm, e_max) * (1 - f0(grid[m].energy, T))# * wji
+        # wji = Ludwig.Weff_squared_123(grid[j], grid[i], grid[m], Fpp, Fpk, kijm, μijm) 
+        # Kjim += Ludwig.Γabc!(ζ, η, grid[j], grid[i], grid[m], T, Δε, bands[μijm], kijm, e_max) * (1 - f0(grid[m].energy, T))# * wji
 
-        w123 = Ludwig.Weff_squared_123(grid[i], grid[m], grid[j], Fpp, Fpk, qimj, μimj)
-        w124 = Ludwig.Weff_squared_124(grid[i], grid[m], grid[j], Fpp, Fpk, qimj, μimj)
-        wij = w123 + w124
+        for μ in 1:3
+            w123 = Ludwig.Weff_squared_123(grid[i], grid[m], grid[j], Fpp, Fpk, qimj, μ)
+            w124 = Ludwig.Weff_squared_124(grid[i], grid[m], grid[j], Fpp, Fpk, qimj, μ)
+            wij = w123 + w124
 
-        Kimj += Ludwig.Γabc!(ζ, η, grid[i], grid[m], grid[j], T, Δε, bands[μimj], qimj, e_max) * f0(grid[m].energy, T) #* wij
+            Kimj += Ludwig.Γabc!(ζ, η, grid[i], grid[m], grid[j], T, Δε, bands[μ], qimj, e_max) * f0(grid[m].energy, T) * wij
 
-        w123 = Ludwig.Weff_squared_123(grid[j], grid[m], grid[i], Fpp, Fpk, qjmi, μjmi)
-        w124 = Ludwig.Weff_squared_124(grid[j], grid[m], grid[i], Fpp, Fpk, qjmi, μjmi)
-        wji = w123 + w124
+            w123 = Ludwig.Weff_squared_123(grid[j], grid[m], grid[i], Fpp, Fpk, qjmi, μ)
+            w124 = Ludwig.Weff_squared_124(grid[j], grid[m], grid[i], Fpp, Fpk, qjmi, μ)
+            wji = w123 + w124
 
-        Kjmi += Ludwig.Γabc!(ζ, η, grid[j], grid[m], grid[i], T, Δε, bands[μjmi], qjmi, e_max) * f0(grid[m].energy, T) #* wji
+            Kjmi += Ludwig.Γabc!(ζ, η, grid[j], grid[m], grid[i], T, Δε, bands[μ], qjmi, e_max) * f0(grid[m].energy, T) * wji
+        end
 
     end
     Kimj *= f0(grid[i].energy, T) * (1 - f0(grid[j].energy, T))

@@ -10,6 +10,9 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
     mesh, Δε = Ludwig.multiband_mesh(bands, orbital_weights, T, n_ε, n_θ; α = α)
     ℓ = length(mesh.patches)
 
+    scale = 1.0
+    integration_mesh, _ = Ludwig.multiband_mesh(bands, orbital_weights, T, ceil(Int, scale * n_ε), n_θ; α = scale * α)
+
     vertex_model = ""
     # vertex_model = "Constant"
 
@@ -26,29 +29,18 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
     N = 1000
     errors = Vector{Float64}(undef, N)
     counter = 0
-    intube_min = 1.0
-    intube_max = 0.0
-    intube_avg = 0.0
 
     while true
         i,j = rand(1:ℓ, 2)
 
-        Lij, intube = Ludwig.electron_electron(mesh.patches, i, j, bands, Δε, T, Fpp, Fpk, mesh.n_bands, mesh.α)
-        intube > intube_max && (intube_max = intube)
-        intube < intube_min && (intube_min = intube)
-        intube_avg += intube
+        Lij = Ludwig.electron_electron(mesh.patches, integration_mesh.patches, i, j, bands, Δε, T, Fpp, Fpk, mesh.n_bands, integration_mesh.α)
 
-        Lji, intube = Ludwig.electron_electron(mesh.patches, j, i, bands, Δε, T, Fpp, Fpk, mesh.n_bands, mesh.α)
-        intube > intube_max && (intube_max = intube)
-        intube < intube_min && (intube_min = intube)
-        intube_avg += intube
+        Lji = Ludwig.electron_electron(mesh.patches, integration_mesh.patches, j, i, bands, Δε, T, Fpp, Fpk, mesh.n_bands, integration_mesh.α)
 
         counter += 1
         errors[counter] = abs( 2 * (Lij - Lji) / (Lij + Lji) )
         if mod(counter, 100) == 0
             @show counter
-            @show intube_min, intube_max
-            @show intube_avg / (2 * counter)
         end
         counter == N && break
 
@@ -56,7 +48,7 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
 
     ## Fit histogram of errors ##
     x_lower = 0.0
-    x_upper = 0.5
+    x_upper = 1.0
     n_bins  = 50
     step    = (x_upper - x_lower) / n_bins 
     bins = LinRange(x_lower, x_upper, n_bins)
@@ -82,9 +74,9 @@ function main(T::Real, n_ε::Int, n_θ::Int, α)
 end
 
 T   = 12.0
-n_ε = 22
+n_ε = 12
 n_θ = 38
 
 include(joinpath(@__DIR__, "materials", "Sr2RuO4.jl"))
 
-main(T, n_ε, n_θ, n_ε / 2.0)
+main(T, n_ε, n_θ, 6)

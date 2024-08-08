@@ -19,6 +19,7 @@ struct Patch{D}
     band_index::Int 
     v::SVector{2,Float64} # Group velocity
     dV::Float64 # Patch area
+    de::Float64 
     jinv::Matrix{Float64} # Jacobian of transformation from (kx, ky) --> (E, θ)
     djinv::Float64 # Inverse jacobian determinant
     w::SVector{D, Float64} # Weight vector of overlap with orbitals
@@ -298,6 +299,7 @@ function multiband_mesh(bands::Vector, W::Function, T::Real, n_levels::Int, n_an
                                     x.band_index,
                                     x.v,
                                     x.dV,
+                                    x.de,
                                     x.jinv, 
                                     x.djinv,
                                     x.w,
@@ -409,6 +411,7 @@ function generate_mesh(bands, W::Function, band_index::Int, n_bands::Int, T::Rea
                 band_index,
                 v[i,j],
                 get_patch_area(corners, i, j),
+                Δε,
                 inv(J),
                 1/det(J),
                 w,
@@ -449,6 +452,7 @@ function patch_op(p::Patch, M::Matrix, corner_perm::Function, n_col::Int, n_row:
         p.band_index,
         SVector{2}(M * p.v),
         p.dV,
+        p.de,
         M * p.jinv, 
         p.djinv,
         p.w,
